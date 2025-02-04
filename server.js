@@ -13,7 +13,7 @@ app.use(cors());
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
     .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.error(err));
+    .catch(err => console.error('MongoDB connection error:', err));
 
 // User schema
 const UserSchema = new mongoose.Schema({
@@ -38,7 +38,9 @@ const transporter = nodemailer.createTransport({
 app.post('/signup', async (req, res) => {
     try {
         const { name, email, password } = req.body;
-        if (!email.endsWith('.edu')) return res.status(400).json({ error: 'Only .edu emails allowed' });
+        if (!email.endsWith('.edu')) {
+            return res.status(400).json({ error: 'Only .edu emails allowed' });
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -52,10 +54,18 @@ app.post('/signup', async (req, res) => {
             subject: 'Verify your email',
             text: `Your verification code is: ${verificationCode}`,
         };
-        transporter.sendMail(mailOptions);
 
-        res.status(201).json({ message: 'User created, verification email sent' });
+        // Send email and handle success or failure
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                console.error('Error sending email:', error);
+                return res.status(500).json({ error: 'Error sending verification email' });
+            }
+            console.log('Email sent:', info.response);
+            res.status(201).json({ message: 'User created, verification email sent' });
+        });
     } catch (error) {
+        console.error('Error:', error);
         res.status(500).json({ error: error.message });
     }
 });
